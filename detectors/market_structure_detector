@@ -1,0 +1,155 @@
+from dataclasses import dataclass
+from typing import List
+
+
+@dataclass
+class SwingPoint:
+    index: int
+    time: object
+    price: float
+    type: str  # HIGH / LOW
+
+
+@dataclass
+class StructureBreak:
+    index: int
+    time: object
+    direction: str  # BULLISH / BEARISH
+    type: str = "BOS"
+    level: float = 0.0
+
+
+class MarketStructureDetector:
+
+    def __init__(
+        self,
+        swing_window: int = 3,
+        min_swing_distance: float = 2.0,
+    ):
+        self.swing_window = swing_window
+        self.min_swing_distance = min_swing_distance
+
+    def process(self, candles):
+
+        swings = self.find_swings(candles)
+        bos = self.find_bos(candles, swings)
+
+        return swings, bos
+
+    def find_swings(self, candles):
+
+        swings = []
+
+        w = self.swing_window
+
+        for i in range(w, len(candles) - w):
+
+            current = candles[i]
+
+            high = current.high
+            low = current.low
+
+            is_high = True
+            is_low = True
+
+            for j in range(i - w, i + w + 1):
+
+                if j == i:
+                    continue
+
+                if candles[j].high >= high:
+                    is_high = False
+
+                if candles[j].low <= low:
+                    is_low = False
+
+            # never allow both on same candle
+            if is_high and is_low:
+
+                high_strength = high - max(
+                    candles[k].high
+                    for k in range(i - w, i + w + 1)
+                    if k != i
+                )
+
+                low_strength = min(
+                    candles[k].low
+                    for k in range(i - w, i + w + 1)
+                    if k != i
+                ) - low
+
+                if high_strength > abs(low_strength):
+                    is_low = False
+                else:
+                    is_high = False
+
+            if is_high:
+
+                if (
+                    len(swings) == 0
+                    or abs(high - swings[-1].price) >= self.min_swing_distance
+                ):
+
+                    swings.append(
+                        SwingPoint(
+                            index=i,
+                            time=current.time,
+                            price=high,
+                            type="HIGH",
+                        )
+                    )
+
+            elif is_low:
+
+                if (
+                    len(swings) == 0
+                    or abs(low - swings[-1].price) >= self.min_swing_distance
+                ):
+
+                    swings.append(
+                        SwingPoint(
+                            index=i,
+                            time=current.time,
+                            price=low,
+                            type="LOW",
+                        )
+                    )
+
+        return swings
+
+    def find_bos(self, candles, swings):
+
+        bos = []
+
+        for i in range(1, len(swings)):
+
+            previous = swings[i - 1]
+            current = swings[i]
+
+            if previous.type == "HIGH" and current.type == "HIGH":
+
+                if current.price > previous.price:
+
+                    bos.append(
+                        StructureBreak(
+                            index=current.index,
+                            time=current.time,
+                            direction="BULLISH",
+                            level=previous.price,
+                        )
+                    )
+
+            elif previous.type == "LOW" and current.type == "LOW":
+
+                if current.price < previous.price:
+
+                    bos.append(
+                        StructureBreak(
+                            index=current.index,
+                            time=current.time,
+                            direction="BEARISH",
+                            level=previous.price,
+                        )
+                    )
+
+        return bos

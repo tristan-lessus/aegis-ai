@@ -1,6 +1,29 @@
+# Python
 venv/
 __pycache__/
 *.pyc
+.pytest_cache/
+
+# Environment / secrets
 .env
+.env.*
+!.env.example
+
+# IDE
 .vscode/
 .idea/
+
+# Runtime / generated AEGIS state
+app/latest_signal.json
+app/market_data.json
+app/alert_state.json
+
+# Backups
+*.backup
+*.bak
+
+# Logs
+*.log
+
+# OS
+.DS_Store
